@@ -44,18 +44,21 @@ fn simple_layout() {
 fn row_column() {
     let (id1, id2, id3, id4, id5, id6) = widget_id6();
     let widget = Flex::row()
+        .must_fill_main_axis(true)
         .with_child(
             Flex::column()
-                .with_child(SizedBox::empty().with_id(id1), 1.0)
-                .with_child(SizedBox::empty().with_id(id2), 1.0),
+                .must_fill_main_axis(true)
+                .with_child(SizedBox::empty().expand_height().with_id(id1), 1.0)
+                .with_child(SizedBox::empty().expand_height().with_id(id2), 1.0),
             1.0,
         )
         .with_child(
             Flex::column()
-                .with_child(SizedBox::empty().with_id(id3), 1.0)
-                .with_child(SizedBox::empty().with_id(id4), 1.0)
-                .with_child(SizedBox::empty().with_id(id5), 1.0)
-                .with_child(SizedBox::empty().with_id(id6), 1.0),
+                .must_fill_main_axis(true)
+                .with_child(SizedBox::empty().expand_height().with_id(id3), 1.0)
+                .with_child(SizedBox::empty().expand_height().with_id(id4), 1.0)
+                .with_child(SizedBox::empty().expand_height().with_id(id5), 1.0)
+                .with_child(SizedBox::empty().expand_height().with_id(id6), 1.0),
             1.0,
         );
 
