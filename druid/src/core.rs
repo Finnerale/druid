@@ -304,21 +304,12 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
             return;
         }
 
-        if let Err(e) = paint_ctx.save() {
-            log::error!("saving render context failed: {:?}", e);
-            return;
-        }
-
-        let layout_origin = self.state.layout_rect.origin().to_vec2();
-        paint_ctx.transform(Affine::translate(layout_origin));
-
-        let visible = paint_ctx.region().to_rect() - layout_origin;
-
-        paint_ctx.with_child_ctx(visible, |ctx| self.paint(ctx, data, &env));
-
-        if let Err(e) = paint_ctx.restore() {
-            log::error!("restoring render context failed: {:?}", e);
-        }
+        paint_ctx.with_save(|paint_ctx| {
+            let layout_origin = self.state.layout_rect.origin().to_vec2();
+            paint_ctx.transform(Affine::translate(layout_origin));
+            let visible = paint_ctx.region().to_rect() - layout_origin;
+            paint_ctx.with_child_ctx(visible, |ctx| self.paint(ctx, data, &env));
+        });
     }
 
     /// Compute layout of a widget.

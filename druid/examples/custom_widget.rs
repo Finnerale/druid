@@ -99,14 +99,11 @@ impl Widget<String> for CustomWidget {
             .unwrap();
 
         // Let's rotate our text slightly. First we save our current (default) context:
-        paint_ctx
-            .with_save(|rc| {
-                // Now we can rotate the context (or set a clip path, for instance):
-                rc.transform(Affine::rotate(0.1));
-                rc.draw_text(&layout, (80.0, 40.0), &fill_color);
-                Ok(())
-            })
-            .unwrap();
+        paint_ctx.with_save(|rc| {
+            // Now we can rotate the context (or set a clip path, for instance):
+            rc.transform(Affine::rotate(0.1));
+            rc.draw_text(&layout, (80.0, 40.0), &fill_color);
+        });
         // When we exit with_save, the original context's rotation is restored
 
         // Let's burn some CPU to make a (partially transparent) image buffer

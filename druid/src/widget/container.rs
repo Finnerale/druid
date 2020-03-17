@@ -141,19 +141,11 @@ impl<T: Data> Widget<T> for Container<T> {
             self.corner_radius,
         );
 
-        if let Err(e) = paint_ctx.save() {
-            log::error!("{}", e);
-            return;
-        }
-
-        paint_ctx.clip(panel);
-
         if let Some(background) = self.background.as_mut() {
-            background.paint(paint_ctx, data, env);
-        }
-
-        if let Err(e) = paint_ctx.restore() {
-            log::error!("{}", e);
+            paint_ctx.with_save(|paint_ctx| {
+                paint_ctx.clip(panel);
+                background.paint(paint_ctx, data, env);
+            });
         }
 
         if let Some(border) = &self.border {
