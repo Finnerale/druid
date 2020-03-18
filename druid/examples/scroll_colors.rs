@@ -35,11 +35,10 @@ fn build_app() -> impl Widget<u32> {
                     1.0 * row_progress,
                     1.0,
                 )),
-                0.0,
             );
         }
 
-        col.add_child(row, 0.0);
+        col.add_child(row);
     }
 
     Scroll::new(col)

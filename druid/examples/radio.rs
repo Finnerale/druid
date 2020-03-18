@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use druid::widget::{Flex, Padding, Radio, RadioGroup, SizedBox};
+use druid::widget::{Flex, MainAxisAlignment, Padding, Radio, RadioGroup};
 use druid::{AppLauncher, Data, LocalizedString, Widget, WindowDesc};
 
 #[derive(Clone, PartialEq, Data)]
@@ -25,28 +25,17 @@ enum Choice {
 
 fn build_widget() -> impl Widget<Choice> {
     Flex::column()
-        .with_child(
-            Padding::new(5.0, Radio::new("First choice", Choice::A)),
-            0.0,
-        )
-        .with_child(
-            Padding::new(5.0, Radio::new("Second choice", Choice::B)),
-            0.0,
-        )
-        .with_child(
-            Padding::new(5.0, Radio::new("Worst choice", Choice::C)),
-            0.0,
-        )
-        .with_child(Padding::new(5.0, Radio::new("Best choice", Choice::D)), 0.0)
-        .with_child(SizedBox::empty(), 1.0)
-        .with_child(
-            RadioGroup::new(vec![
-                ("Good times", Choice::A),
-                ("Ergonomics", Choice::B),
-                ("No fourth choice!", Choice::C),
-            ]),
-            0.0,
-        )
+        .main_axis_alignment(MainAxisAlignment::Center)
+        .with_child(Padding::new(5.0, Radio::new("First choice", Choice::A)))
+        .with_child(Padding::new(5.0, Radio::new("Second choice", Choice::B)))
+        .with_child(Padding::new(5.0, Radio::new("Worst choice", Choice::C)))
+        .with_child(Padding::new(5.0, Radio::new("Best choice", Choice::D)))
+        .with_spacer(32.0)
+        .with_child(RadioGroup::new(vec![
+            ("Good times", Choice::A),
+            ("Ergonomics", Choice::B),
+            ("No fourth choice!", Choice::C),
+        ]))
 }
 
 fn main() {

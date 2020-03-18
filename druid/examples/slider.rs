@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use druid::widget::{
-    Align, Button, Checkbox, Flex, Label, Padding, ProgressBar, Slider, WidgetExt,
-};
-use druid::{AppLauncher, Data, Lens, LensWrap, LocalizedString, UnitPoint, Widget, WindowDesc};
+use druid::widget::{Button, Checkbox, Flex, Label, Padding, ProgressBar, Slider, WidgetExt};
+use druid::{AppLauncher, Data, Lens, LensWrap, LocalizedString, Widget, WindowDesc};
 
 #[derive(Clone, Data, Lens)]
 struct DemoState {
@@ -38,21 +36,19 @@ fn build_widget() -> impl Widget<DemoState> {
 
     let button_1 = Button::new("increment ", |_ctx, data: &mut DemoState, _env| {
         data.value += 0.1
-    })
-    .fix_size(200.0, 100.0)
-    .align_vertical(UnitPoint::CENTER);
+    });
 
     let button_2 = Button::new("decrement ", |_ctx, data: &mut DemoState, _env| {
         data.value -= 0.1
     });
 
     Flex::column()
-        .with_child(Padding::new(5.0, bar), 1.0)
-        .with_child(Padding::new(5.0, slider), 1.0)
-        .with_child(Padding::new(5.0, label), 1.0)
-        .with_child(Padding::new(5.0, checkbox), 1.0)
-        .with_child(Padding::new(5.0, Align::right(button_1)), 0.0)
-        .with_child(Padding::new(5.0, button_2), 1.0)
+        .with_flex_child(Padding::new(5.0, bar), 1.0)
+        .with_flex_child(Padding::new(5.0, slider), 1.0)
+        .with_flex_child(Padding::new(5.0, label), 1.0)
+        .with_flex_child(Padding::new(5.0, checkbox), 1.0)
+        .with_child(Padding::new(5.0, button_1))
+        .with_flex_child(Padding::new(5.0, button_2), 1.0)
 }
 
 fn main() {

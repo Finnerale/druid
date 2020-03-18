@@ -82,9 +82,9 @@
 //!     let layout = Flex::column()
 //!         // center the items horizontally in the container
 //!         .cross_axis_alignment(CrossAxisAlignment::Center)
-//!         .with_child(label, 0.0)
+//!         .with_child(label)
 //!         .with_spacer(VERTICAL_WIDGET_SPACING)
-//!         .with_child(textbox, 0.0);
+//!         .with_child(textbox);
 //!
 //!     // center the two widgets in the available space
 //!     Align::centered(layout)

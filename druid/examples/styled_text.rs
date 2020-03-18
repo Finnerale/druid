@@ -14,7 +14,9 @@
 
 //! Example of dynamic text styling
 
-use druid::widget::{CrossAxisAlignment, Flex, Label, Parse, Stepper, TextBox, WidgetExt};
+use druid::widget::{
+    CrossAxisAlignment, Flex, Label, MainAxisAlignment, Parse, Stepper, TextBox, WidgetExt,
+};
 use druid::{
     theme, AppLauncher, Data, Key, Lens, LensExt, LensWrap, LocalizedString, PlatformError, Widget,
     WindowDesc,
@@ -77,14 +79,19 @@ fn ui_builder() -> impl Widget<AppData> {
 
     let stepper_row = Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Center)
-        .with_child(stepper_textbox, 0.0)
-        .with_child(stepper, 0.0);
+        .with_child(stepper_textbox)
+        .with_child(stepper);
 
     let input = TextBox::new().lens(AppData::text);
 
     Flex::column()
-        .with_child(label.center(), 1.0)
-        .with_child(styled_label.center(), 1.0)
-        .with_child(stepper_row.center(), 1.0)
-        .with_child(input.padding(5.0).center(), 1.0)
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .main_axis_alignment(MainAxisAlignment::Center)
+        .with_child(label)
+        .with_spacer(8.0)
+        .with_child(styled_label)
+        .with_spacer(32.0)
+        .with_child(stepper_row)
+        .with_spacer(8.0)
+        .with_child(input.padding(5.0))
 }

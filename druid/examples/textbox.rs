@@ -14,7 +14,9 @@
 
 //! Demos the textbox widget, as well as menu creation and overriding theme settings.
 
-use druid::widget::{EnvScope, Flex, Label, Padding, TextBox};
+use druid::widget::{
+    CrossAxisAlignment, EnvScope, Flex, Label, MainAxisAlignment, Padding, TextBox, WidgetExt,
+};
 use druid::{theme, AppLauncher, Color, Data, LocalizedString, MenuDesc, Widget, WindowDesc};
 
 fn main() {
@@ -48,9 +50,11 @@ fn build_widget() -> impl Widget<String> {
     let label = Label::new(|data: &String, _env: &_| format!("value: {}", data));
 
     Flex::column()
-        .with_child(Padding::new(5.0, textbox), 1.0)
-        .with_child(Padding::new(5.0, textbox_2), 1.0)
-        .with_child(Padding::new(5.0, label), 1.0)
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .main_axis_alignment(MainAxisAlignment::Center)
+        .with_child(Padding::new(5.0, label))
+        .with_child(Padding::new(5.0, textbox).fix_width(200.0))
+        .with_child(Padding::new(5.0, textbox_2).fix_width(200.0))
 }
 
 fn make_main_menu<T: Data>() -> MenuDesc<T> {
