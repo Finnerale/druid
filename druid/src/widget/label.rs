@@ -53,6 +53,7 @@ pub struct Label<T> {
     text: LabelText<T>,
     color: KeyOrValue<Color>,
     size: KeyOrValue<f64>,
+    layout: Option<PietTextLayout>,
 }
 
 impl<T: Data> Label<T> {
@@ -78,6 +79,7 @@ impl<T: Data> Label<T> {
             text,
             color: theme::LABEL_COLOR.into(),
             size: theme::TEXT_SIZE_NORMAL.into(),
+            layout: None,
         }
     }
 
@@ -168,14 +170,14 @@ impl<T: Data> Label<T> {
         self.size = size.into();
     }
 
-    fn get_layout(&mut self, t: &mut PietText, env: &Env) -> PietTextLayout {
+    fn get_layout(&mut self, t: &mut PietText, bc: &BoxConstraints, env: &Env) -> PietTextLayout {
         let font_name = env.get(theme::FONT_NAME);
         let font_size = self.size.resolve(env);
 
         // TODO: caching of both the format and the layout
         let font = t.new_font_by_name(font_name, font_size).build().unwrap();
         self.text.with_display_text(|text| {
-            t.new_text_layout(&font, &text, std::f64::INFINITY)
+            t.new_text_layout(&font, &text, bc.max().width)
                 .build()
                 .unwrap()
         })
@@ -248,16 +250,19 @@ impl<T: Data> Widget<T> for Label<T> {
         bc.debug_check("Label");
 
         let font_size = self.size.resolve(env);
-        let text_layout = self.get_layout(layout_ctx.text(), env);
+        let text_layout = self.get_layout(layout_ctx.text(), bc, env);
+        let text_width = text_layout.width();
+        let lines = text_layout.line_count() as f64;
+        self.layout = Some(text_layout);
         bc.constrain(Size::new(
-            text_layout.width() + 2. * LABEL_X_PADDING,
-            font_size * LINE_HEIGHT_FACTOR,
+            text_width + 2. * LABEL_X_PADDING,
+            lines * font_size * LINE_HEIGHT_FACTOR,
         ))
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, _data: &T, env: &Env) {
         let font_size = self.size.resolve(env);
-        let text_layout = self.get_layout(ctx.text(), env);
+        let text_layout = self.layout.as_ref().unwrap();
         let line_height = font_size * LINE_HEIGHT_FACTOR;
 
         // Find the origin for the text
