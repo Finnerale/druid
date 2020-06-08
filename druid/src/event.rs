@@ -151,6 +151,7 @@ pub enum InternalEvent {
     TargetedCommand(Target, Command),
     /// Used for routing timer events.
     RouteTimer(TimerToken, WidgetId),
+    RouteModalEvent(Box<Event>, WidgetId),
 }
 
 /// Application life cycle events.

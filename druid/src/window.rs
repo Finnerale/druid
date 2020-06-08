@@ -52,6 +52,7 @@ pub struct Window<T> {
     pub(crate) focus: Option<WidgetId>,
     pub(crate) handle: WindowHandle,
     pub(crate) timers: HashMap<TimerToken, WidgetId>,
+    pub(crate) modals: Vec<WidgetId>,
     // delegate?
 }
 
@@ -69,6 +70,7 @@ impl<T> Window<T> {
             focus: None,
             handle,
             timers: HashMap::new(),
+            modals: Vec::new(),
         }
     }
 }
@@ -159,6 +161,19 @@ impl<T: Data> Window<T> {
         env: &Env,
     ) -> bool {
         match &event {
+            Event::Command(cmd) if cmd.is(crate::commands::SHOW_MODAL) => {
+                let id = cmd.get_unchecked(crate::commands::SHOW_MODAL);
+                self.modals.push(*id);
+                return true;
+            }
+            Event::Command(cmd) if cmd.is(crate::commands::CLOSE_MODAL) => {
+                self.modals.pop();
+                return true;
+            }
+            _ => (),
+        }
+
+        match &event {
             Event::WindowSize(size) => self.size = *size,
             Event::MouseDown(e) | Event::MouseUp(e) | Event::MouseMove(e) | Event::Wheel(e) => {
                 self.last_mouse_pos = Some(e.pos)
@@ -205,6 +220,16 @@ impl<T: Data> Window<T> {
                 is_root: true,
             };
 
+            if !self.modals.is_empty() {
+                let boxed_event = Box::new(event.clone());
+                for modal in &self.modals {
+                    let modal_event = Event::Internal(InternalEvent::RouteModalEvent(
+                        boxed_event.clone(),
+                        *modal,
+                    ));
+                    self.root.event(&mut ctx, &modal_event, data, env);
+                }
+            }
             self.root.event(&mut ctx, &event, data, env);
             ctx.is_handled
         };

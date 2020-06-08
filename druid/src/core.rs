@@ -78,6 +78,7 @@ pub(crate) struct WidgetState {
     /// This should always be set; it is only an `Option` so that we
     /// can more easily track (and help debug) if it hasn't been set.
     layout_rect: Option<Rect>,
+    layout_absolute: bool,
     /// The insets applied to the layout rect to generate the paint rect.
     /// In general, these will be zero; the exception is for things like
     /// drop shadows or overflowing text.
@@ -185,6 +186,10 @@ impl<T, W: Widget<T>> WidgetPod<T, W> {
     /// Get the identity of the widget.
     pub fn id(&self) -> WidgetId {
         self.state.id
+    }
+
+    pub(crate) fn set_layout_absolute(&mut self, absolute: bool) {
+        self.state.layout_absolute = absolute;
     }
 
     /// Set the layout [`Rect`].
@@ -604,6 +609,14 @@ impl<T: Data, W: Widget<T>> WidgetPod<T, W> {
                         self.state.children.may_contain(widget_id)
                     }
                 }
+                InternalEvent::RouteModalEvent(event, widget_id) => {
+                    if *widget_id == self.id() {
+                        modified_event = Some(event.as_ref().clone());
+                        true
+                    } else {
+                        self.state.children.may_contain(widget_id)
+                    }
+                }
             },
             Event::WindowConnected => true,
             Event::WindowSize(_) => {
@@ -884,6 +897,7 @@ impl WidgetState {
         WidgetState {
             id,
             layout_rect: None,
+            layout_absolute: false,
             paint_insets: Insets::ZERO,
             invalid: Region::EMPTY,
             viewport_offset: Vec2::ZERO,

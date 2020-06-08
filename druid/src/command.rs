@@ -129,7 +129,7 @@ pub mod sys {
     use std::any::Any;
 
     use super::Selector;
-    use crate::{FileDialogOptions, FileInfo, SingleUse};
+    use crate::{FileDialogOptions, FileInfo, SingleUse, WidgetId};
 
     /// Quit the running application. This command is handled by the druid library.
     pub const QUIT_APP: Selector = Selector::new("druid-builtin.quit-app");
@@ -236,6 +236,10 @@ pub mod sys {
 
     /// Redo.
     pub const REDO: Selector = Selector::new("druid-builtin.menu-redo");
+
+    pub(crate) const SHOW_MODAL: Selector<WidgetId> = Selector::new("druid-builtin.show-modal");
+
+    pub(crate) const CLOSE_MODAL: Selector = Selector::new("druid-buildin.hide-modal");
 }
 
 impl Selector<()> {
