@@ -17,6 +17,7 @@ default-target = "x86_64-pc-windows-msvc"
 x11 = ["x11rb", "nix", "cairo-sys-rs"]
 gtk = ["gio", "gdk", "gdk-sys", "glib", "glib-sys", "gtk-sys", "gtk-rs"]
 default = ["gtk"]
+wayland = ["wayland-client", "wayland-protocols", "tempfile", "memmap"]
 
 [dependencies]
 # NOTE: When changing the piet or kurbo versions, ensure that
@@ -52,7 +53,7 @@ cairo-rs = { version = "0.9.1", default_features = false, optional = true }
 [target.'cfg(target_os="linux")'.dependencies]
 # TODO(x11/dependencies): only use feature "xcb" if using X11
 cairo-rs = { version = "0.9.1", default_features = false, features = ["xcb"] }
-cairo-sys-rs = { version = "0.10.0", default_features = false, optional = true }
+# GTK dependencies
 gio = { version = "0.9.1", optional = true }
 gdk = { version = "0.13.2", optional = true }
 gdk-sys = { version = "0.10.0", optional = true }
@@ -61,8 +62,15 @@ gtk-rs = { version = "0.9.2", features = ["v3_22"], package = "gtk", optional = 
 glib = { version = "0.10.1", optional = true }
 glib-sys = { version = "0.10.0", optional = true }
 gtk-sys = { version = "0.10.0", optional = true }
+# X11 dependencies
 nix = { version = "0.18.0", optional = true }
 x11rb = { version = "0.6.0", features = ["allow-unsafe-code", "present", "randr", "xfixes"], optional = true }
+cairo-sys-rs = { version = "0.10.0", default_features = false, optional = true }
+# Wayland dependencies
+tempfile = { version = "3.1.0", optional = true }
+wayland-client = { version = "0.28.0", optional = true }
+wayland-protocols = { version = "0.28.0", features = ["client", "unstable_protocols"], optional = true }
+memmap = { version = "0.7.0", optional = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 wasm-bindgen = "0.2.67"
