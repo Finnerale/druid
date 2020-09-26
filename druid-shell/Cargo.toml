@@ -14,8 +14,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 default-target = "x86_64-pc-windows-msvc"
 
 [features]
-x11 = ["x11rb", "nix", "cairo-sys-rs"]
-gtk = ["gio", "gdk", "gdk-sys", "glib", "glib-sys", "gtk-sys", "gtk-rs"]
+#x11 = ["x11rb", "nix", "cairo-sys-rs"]
+#gtk = ["gio", "gdk", "gdk-sys", "glib", "glib-sys", "gtk-sys", "gtk-rs"]
 wayland = ["wayland-client", "wayland-protocols", "tempfile", "memmap"]
 default = ["wayland"]
 

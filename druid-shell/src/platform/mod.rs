@@ -28,25 +28,61 @@ pub use mac::*;
 #[cfg(target_os = "macos")]
 pub(crate) mod shared;
 
-#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
+#[cfg(all(
+    feature = "x11",
+    not(any(feature = "gtk", feature = "wayland")),
+    target_os = "linux"
+))]
 mod x11;
-#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
+#[cfg(all(
+    feature = "x11",
+    not(any(feature = "gtk", feature = "wayland")),
+    target_os = "linux"
+))]
 pub use x11::*;
-#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
+#[cfg(all(
+    feature = "x11",
+    not(any(feature = "gtk", feature = "wayland")),
+    target_os = "linux"
+))]
 pub(crate) mod shared;
 
-#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
+#[cfg(all(
+    feature = "wayland",
+    not(any(feature = "gtk", feature = "x11")),
+    target_os = "linux"
+))]
 mod wayland;
-#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
+#[cfg(all(
+    feature = "wayland",
+    not(any(feature = "gtk", feature = "x11")),
+    target_os = "linux"
+))]
 pub use wayland::*;
-#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
+#[cfg(all(
+    feature = "wayland",
+    not(any(feature = "gtk", feature = "x11")),
+    target_os = "linux"
+))]
 pub(crate) mod shared;
 
-#[cfg(all(feature = "gtk", target_os = "linux"))]
+#[cfg(all(
+    feature = "gtk",
+    not(any(feature = "wayland", feature = "x11")),
+    target_os = "linux"
+))]
 mod gtk;
-#[cfg(all(feature = "gtk", target_os = "linux"))]
+#[cfg(all(
+    feature = "gtk",
+    not(any(feature = "wayland", feature = "x11")),
+    target_os = "linux"
+))]
 pub use self::gtk::*;
-#[cfg(all(feature = "gtk", target_os = "linux"))]
+#[cfg(all(
+    feature = "gtk",
+    not(any(feature = "wayland", feature = "x11")),
+    target_os = "linux"
+))]
 pub(crate) mod shared;
 
 #[cfg(target_arch = "wasm32")]

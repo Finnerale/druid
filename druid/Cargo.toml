@@ -20,10 +20,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 default-target = "x86_64-pc-windows-msvc"
 
 [features]
-x11 = ["druid-shell/x11"]
-gtk = ["druid-shell/gtk"]
+#x11 = ["druid-shell/x11"]
+#gtk = ["druid-shell/gtk"]
+wayland = ["druid-shell/wayland"]
 svg = ["usvg", "harfbuzz-sys"]
-default = ["gtk"]
+default = ["wayland"]
 
 [dependencies]
 druid-shell = { version = "0.6.0", default-features = false, path = "../druid-shell" }
