@@ -5,7 +5,7 @@ use crate::{
     platform::{menu::Menu, timer::Timer, window::IdleHandle, window::Window},
     window, Cursor, FileDialogOptions, FileInfo, Scale, TimerToken, WindowLevel,
 };
-use std::{sync::Arc, sync::Weak, time::Instant};
+use std::{rc::Weak, sync::Arc, time::Instant};
 
 #[derive(Clone, Default)]
 pub struct WindowHandle {
@@ -14,7 +14,7 @@ pub struct WindowHandle {
 }
 
 impl WindowHandle {
-    fn new(id: u32, window: Weak<Window>) -> WindowHandle {
+    pub(super) fn new(id: u32, window: Weak<Window>) -> WindowHandle {
         WindowHandle { id, window }
     }
 

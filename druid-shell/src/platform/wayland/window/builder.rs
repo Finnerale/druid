@@ -3,6 +3,11 @@ use crate::{
     platform::{application::Application, menu::Menu, window::WindowHandle},
     window, Error, WinHandler,
 };
+use anyhow::{anyhow, Context};
+use std::{cell::RefCell, collections::BinaryHeap, rc::Rc, sync::Arc, sync::Mutex};
+use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
+
+use super::{Window, WindowState};
 
 pub struct WindowBuilder {
     app: Application,
@@ -52,6 +57,83 @@ impl WindowBuilder {
     pub fn set_menu(&mut self, _menu: Menu) {}
 
     pub fn build(self) -> Result<WindowHandle, Error> {
-        unimplemented!()
+        let id = self.app.state.borrow_mut().window_counter;
+        self.app.state.borrow_mut().window_counter += 1;
+
+        let wl_surface = self.app.globals.compositor.create_surface();
+        let xdg_surface = self.app.globals.wm_base.get_xdg_surface(&*wl_surface);
+        let xdg_toplevel = xdg_surface.get_toplevel();
+        self.app.globals.wm_base.quick_assign(|wm_base, event, _| {
+            use xdg_wm_base::Event;
+            if let Event::Ping { serial } = event {
+                wm_base.pong(serial);
+            }
+        });
+        xdg_toplevel.set_title("Wayplay".to_string());
+        xdg_toplevel.set_app_id("wayplay".to_string());
+
+        xdg_surface.quick_assign(|xdg_surface, event, _| {
+            use xdg_surface::Event;
+            if let Event::Configure { serial } = event {
+                xdg_surface.ack_configure(serial);
+            }
+        });
+        xdg_toplevel.quick_assign(|_xdg_toplevel, event, _| {
+            use xdg_toplevel::Event;
+            if let Event::Configure { width, height, .. } = event {
+                println!(
+                    "xdg_toplevel::Configure with width={} and height={}.",
+                    width, height
+                );
+            }
+        });
+        wl_surface.commit();
+        self.app
+            .event_queue
+            .lock()
+            .map_err(|_| anyhow!("Failed to lock event_queue. ({}, {})", file!(), line!()))?
+            .sync_roundtrip(&mut (), |_, _, _| {})
+            .context("Failed to do sync roundtrip after committing the new surface")?;
+
+        let cairo_surface = RefCell::new(
+            cairo::ImageSurface::create(cairo::Format::ARgb32, 0, 0)
+                .context("Could not create empty Cairo surface")?,
+        );
+        let buffer_handle = RefCell::new(None);
+        let timer_queue = Mutex::new(BinaryHeap::new());
+        let idle_queue = Arc::new(Mutex::new(Vec::new()));
+
+        let handler = RefCell::new(
+            self.handler
+                .ok_or(anyhow::anyhow!("Handler must be set."))?,
+        );
+
+        let app = self.app.clone();
+
+        let mut state = WindowState::default();
+        state.size = self.size;
+        let state = RefCell::new(state);
+
+        let window = Window {
+            id,
+            app,
+            handler,
+            state,
+
+            cairo_surface,
+            buffer_handle,
+            wl_surface,
+            xdg_surface,
+            xdg_toplevel,
+
+            timer_queue,
+            idle_queue,
+        };
+        let window = Rc::new(window);
+
+        let handle = WindowHandle::new(id, Rc::downgrade(&window));
+        self.app.state.borrow_mut().windows.push(window);
+
+        Ok(handle)
     }
 }

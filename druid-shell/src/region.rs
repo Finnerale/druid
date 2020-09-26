@@ -1,7 +1,7 @@
 use kurbo::{BezPath, Rect, Shape, Vec2};
 
 /// A union of rectangles, useful for describing an area that needs to be repainted.
-#[derive(Clone, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct Region {
     rects: Vec<Rect>,
 }
