@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::TimerToken;
 use std::{cmp::Ordering, time::Instant};
 

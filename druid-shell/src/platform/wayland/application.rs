@@ -1,15 +1,17 @@
+#![allow(dead_code)]
+
 //! Implementation of features at the application scope.
 
 use crate::{
     application::AppHandler, error::Error, platform::clipboard::Clipboard, platform::window::Window,
 };
-use anyhow::Context;
+use anyhow::{Context, Result};
 use std::{cell::RefCell, rc::Rc, sync::Mutex};
 use wayland_client::{
-    protocol::{wl_compositor, wl_display, wl_seat, wl_shm},
+    protocol::{wl_compositor, wl_seat, wl_shm},
     GlobalManager, Main,
 };
-use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_wm_base};
+use wayland_protocols::xdg_shell::client::xdg_wm_base;
 
 #[derive(Clone)]
 pub struct Application {
@@ -78,16 +80,9 @@ impl Application {
         })
     }
 
-    pub fn run(self, handler: Option<Box<dyn AppHandler>>) {
-        self.event_queue
-            .lock()
-            .unwrap()
-            .sync_roundtrip(&mut (), |_, _, _| { /* we ignore unfiltered messages */ });
-        loop {
-            self.event_queue
-                .lock()
-                .unwrap()
-                .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ });
+    pub fn run(self, _handler: Option<Box<dyn AppHandler>>) {
+        if let Err(err) = self.inner_run() {
+            eprintln!("Application::run failed: {}", err);
         }
     }
 
@@ -99,5 +94,20 @@ impl Application {
 
     pub fn get_locale() -> String {
         "en-US".into()
+    }
+}
+
+impl Application {
+    pub fn inner_run(&self) -> Result<()> {
+        self.event_queue
+            .lock()
+            .unwrap()
+            .sync_roundtrip(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })?;
+        loop {
+            self.event_queue
+                .lock()
+                .unwrap()
+                .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })?;
+        }
     }
 }

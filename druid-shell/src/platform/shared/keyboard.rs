@@ -51,6 +51,7 @@ pub fn code_to_location(code: Code) -> Location {
     }
 }
 
+#[cfg(not(feature = "wayland"))]
 #[cfg(target_os = "linux")]
 /// Map hardware keycode to code.
 ///

@@ -16,40 +16,40 @@
 
 // It would be clearer to use cfg_if! macros here, but that breaks rustfmt.
 
-// #[cfg(target_os = "windows")]
-// mod windows;
-// #[cfg(target_os = "windows")]
-// pub use windows::*;
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use windows::*;
 
-// #[cfg(target_os = "macos")]
-// mod mac;
-// #[cfg(target_os = "macos")]
-// pub use mac::*;
-// #[cfg(target_os = "macos")]
-// pub(crate) mod shared;
-
-//#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
-//mod x11;
-//#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
-//pub use x11::*;
-//#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
-//pub(crate) mod shared;
-
-//#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
-mod wayland;
-//#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
-pub use wayland::*;
-//#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
+#[cfg(target_os = "macos")]
+mod mac;
+#[cfg(target_os = "macos")]
+pub use mac::*;
+#[cfg(target_os = "macos")]
 pub(crate) mod shared;
 
-//#[cfg(all(feature = "gtk", target_os = "linux"))]
-//mod gtk;
-//#[cfg(all(feature = "gtk", target_os = "linux"))]
-//pub use self::gtk::*;
-//#[cfg(all(feature = "gtk", target_os = "linux"))]
-//pub(crate) mod shared;
+#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
+mod x11;
+#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
+pub use x11::*;
+#[cfg(all(feature = "x11", not(feature = "gtk"), target_os = "linux"))]
+pub(crate) mod shared;
 
-// #[cfg(target_arch = "wasm32")]
-// mod web;
-// #[cfg(target_arch = "wasm32")]
-// pub use web::*;
+#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
+mod wayland;
+#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
+pub use wayland::*;
+#[cfg(all(feature = "wayland", not(feature = "gtk"), target_os = "linux"))]
+pub(crate) mod shared;
+
+#[cfg(all(feature = "gtk", target_os = "linux"))]
+mod gtk;
+#[cfg(all(feature = "gtk", target_os = "linux"))]
+pub use self::gtk::*;
+#[cfg(all(feature = "gtk", target_os = "linux"))]
+pub(crate) mod shared;
+
+#[cfg(target_arch = "wasm32")]
+mod web;
+#[cfg(target_arch = "wasm32")]
+pub use web::*;

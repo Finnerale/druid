@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+
 use crate::{
     kurbo::{Rect, Size},
     piet::{Piet, RenderContext},
     platform::{menu::Menu, timer::Timer},
     Error, Region, Scale, WinHandler,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use cairo::ImageSurface;
 use std::os::unix::io::AsRawFd;
 use std::{
@@ -70,9 +72,9 @@ impl Window {
         eprintln!("Can't close windows yet!");
     }
 
-    pub fn resizable(&self, resizable: bool) {}
+    pub fn resizable(&self, _resizable: bool) {}
 
-    pub fn show_titlebar(&self, show_titlebar: bool) {}
+    pub fn show_titlebar(&self, _show_titlebar: bool) {}
 
     pub fn bring_to_front_and_focus(&self) {}
 
@@ -97,9 +99,9 @@ impl Window {
         self.request_anim_frame();
     }
 
-    pub fn set_title(&self, title: &str) {}
+    pub fn set_title(&self, _title: &str) {}
 
-    pub fn set_menu(&self, menu: Menu) {}
+    pub fn set_menu(&self, _menu: Menu) {}
 
     pub fn get_scale(&self) -> Result<Scale, Error> {
         Ok(Scale::default())

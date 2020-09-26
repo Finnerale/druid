@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{common_util::IdleCallback, IdleToken};
 use std::{
     any::Any,

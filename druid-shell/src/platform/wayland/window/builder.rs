@@ -105,7 +105,7 @@ impl WindowBuilder {
 
         let handler = RefCell::new(
             self.handler
-                .ok_or(anyhow::anyhow!("Handler must be set."))?,
+                .ok_or_else(|| anyhow::anyhow!("Handler must be set."))?,
         );
 
         let app = self.app.clone();
