@@ -15,7 +15,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use wayland_client::{
-    protocol::{wl_buffer, wl_shm, wl_surface},
+    protocol::{wl_buffer, wl_shm, wl_shm_pool, wl_surface},
     Main,
 };
 use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_toplevel};
@@ -49,6 +49,7 @@ pub(crate) struct Window {
     pub(super) state: RefCell<WindowState>,
 
     pub(super) cairo_surface: RefCell<ImageSurface>,
+    pub(super) pool_handle: RefCell<Option<wl_shm_pool::WlShmPool>>,
     pub(super) buffer_handle: RefCell<Option<wl_buffer::WlBuffer>>,
     pub(super) wl_surface: Main<wl_surface::WlSurface>,
     pub(super) xdg_surface: Main<xdg_surface::XdgSurface>,
@@ -155,6 +156,7 @@ impl Window {
 
     fn update_surface(&self) -> Result<()> {
         let size = borrow!(self.state)?.size;
+        borrow_mut!(self.state)?.invalid.add_rect(size.to_rect());
         let buf_len = (size.width * size.height) as u64 * 4;
         let file = tempfile::tempfile()?;
         file.set_len(buf_len)?;
@@ -188,6 +190,7 @@ impl Window {
             size.width as i32 * 4,
             wl_shm::Format::Argb8888,
         );
+        self.pool_handle.replace(Some(pool.detach()));
         self.buffer_handle.replace(Some(buffer.detach()));
         Ok(())
     }

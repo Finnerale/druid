@@ -78,15 +78,6 @@ impl WindowBuilder {
                 xdg_surface.ack_configure(serial);
             }
         });
-        xdg_toplevel.quick_assign(|_xdg_toplevel, event, _| {
-            use xdg_toplevel::Event;
-            if let Event::Configure { width, height, .. } = event {
-                println!(
-                    "xdg_toplevel::Configure with width={} and height={}.",
-                    width, height
-                );
-            }
-        });
         wl_surface.commit();
         self.app
             .event_queue
@@ -99,6 +90,7 @@ impl WindowBuilder {
             cairo::ImageSurface::create(cairo::Format::ARgb32, 0, 0)
                 .context("Could not create empty Cairo surface")?,
         );
+        let pool_handle = RefCell::new(None);
         let buffer_handle = RefCell::new(None);
         let timer_queue = Mutex::new(BinaryHeap::new());
         let idle_queue = Arc::new(Mutex::new(Vec::new()));
@@ -121,6 +113,7 @@ impl WindowBuilder {
             state,
 
             cairo_surface,
+            pool_handle,
             buffer_handle,
             wl_surface,
             xdg_surface,
@@ -132,6 +125,8 @@ impl WindowBuilder {
         let window = Rc::new(window);
 
         let handle = WindowHandle::new(id, Rc::downgrade(&window));
+        let shell_handle = crate::WindowHandle::from(handle.clone());
+        borrow_mut!(window.handler)?.connect(&shell_handle);
         self.app.state.borrow_mut().windows.push(window);
 
         Ok(handle)
