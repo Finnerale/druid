@@ -127,6 +127,7 @@ impl WindowBuilder {
         let handle = WindowHandle::new(id, Rc::downgrade(&window));
         let shell_handle = crate::WindowHandle::from(handle.clone());
         borrow_mut!(window.handler)?.connect(&shell_handle);
+        borrow_mut!(window.handler)?.size(self.size);
         self.app.state.borrow_mut().windows.push(window);
 
         Ok(handle)

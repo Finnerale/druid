@@ -2,13 +2,11 @@
 
 //! Implementation of features at the application scope.
 
-use crate::{
-    application::AppHandler, error::Error, platform::clipboard::Clipboard, platform::window::Window,
-};
+use crate::{MouseEvent, application::AppHandler, error::Error, platform::clipboard::Clipboard, platform::window::Window};
 use anyhow::{Context, Result};
 use std::{cell::RefCell, rc::Rc, sync::Mutex};
 use wayland_client::{
-    protocol::{wl_compositor, wl_seat, wl_shm},
+    protocol::{wl_compositor, wl_seat, wl_shm, wl_pointer, wl_keyboard, wl_surface},
     GlobalManager, Main,
 };
 use wayland_protocols::xdg_shell::client::xdg_wm_base;
@@ -39,6 +37,17 @@ pub(crate) struct Globals {
     pub wm_base: Main<xdg_wm_base::XdgWmBase>,
 }
 
+mod events {
+    use wayland_client::event_enum;
+    use wayland_client::protocol::{wl_pointer, wl_keyboard};
+    event_enum! {
+        Events |
+        Pointer => wl_pointer::WlPointer,
+        Keyboard => wl_keyboard::WlKeyboard
+    }
+}
+use events::Events;
+
 impl Globals {
     pub fn new(manager: GlobalManager) -> anyhow::Result<Self> {
         let shm = manager
@@ -48,7 +57,7 @@ impl Globals {
             .instantiate_exact::<wl_compositor::WlCompositor>(4)
             .context("compositor")?;
         let seat = manager
-            .instantiate_exact::<wl_seat::WlSeat>(5)
+            .instantiate_exact::<wl_seat::WlSeat>(1)
             .context("seat")?;
         let wm_base = manager
             .instantiate_exact::<xdg_wm_base::XdgWmBase>(1)
@@ -72,12 +81,15 @@ impl Application {
             .sync_roundtrip(&mut (), |_, _, _| {})
             .context("First sync roundtrip failed")?;
         let globals = Globals::new(manager).context("Failed to acquire all globals")?;
-        Ok(Application {
+        let app = Application {
             display,
             globals: Rc::new(globals),
             event_queue: Rc::new(Mutex::new(event_queue)),
             state: Rc::new(RefCell::new(State::default())),
-        })
+        };
+        // Doing this in `run` seems better, but then it's too late.
+        app.assign_filter();
+        Ok(app)
     }
 
     pub fn run(self, _handler: Option<Box<dyn AppHandler>>) {
@@ -98,16 +110,130 @@ impl Application {
 }
 
 impl Application {
-    pub fn inner_run(&self) -> Result<()> {
+    fn assign_filter(&self) {
+        let input_filter = event_filter(self.clone());
+        let mut pointer_created = false;
+        let mut keyboard_created = false;
+        println!("Quick assign to seat");
+        self.globals.seat.quick_assign(move |seat, event, _| {
+            if let wl_seat::Event::Capabilities { capabilities } = event {
+                println!("Received capabilities");
+                if !pointer_created && capabilities.contains(wl_seat::Capability::Pointer) {
+                    pointer_created = true;
+                    seat.get_pointer().assign(input_filter.clone());
+                }
+                if !keyboard_created && capabilities.contains(wl_seat::Capability::Keyboard) {
+                    keyboard_created = true;
+                    seat.get_pointer().assign(input_filter.clone());
+                }
+            }
+        });
+    }
+
+    pub(crate) fn roundtrip(&self) -> Result<()> {
         self.event_queue
             .lock()
-            .unwrap()
+            .map_err(|_| anyhow::anyhow!("Failed to lock Application::event_queue"))?
             .sync_roundtrip(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })?;
+        Ok(())
+    }
+
+    fn inner_run(&self) -> Result<()> {
+        self.roundtrip()?;
         loop {
             self.event_queue
                 .lock()
-                .unwrap()
+                .map_err(|_| anyhow::anyhow!("Failed to lock Application::event_queue"))?
                 .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })?;
         }
     }
+
+    pub fn render_window(&self, window_id: u32) {
+        if let Ok(state) = borrow!(self.state) {
+            for window in &state.windows {
+                if window.id == window_id {
+                    window.render();
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fn event_filter(app: Application) -> wayland_client::Filter<Events> {
+    let mut cursor_pos = kurbo::Point::ZERO;
+    let mut focused: Option<wl_surface::WlSurface> = None;
+    wayland_client::Filter::new(move |event, _, _| match event {
+        Events::Pointer { event, .. } => match event {
+            wl_pointer::Event::Enter { surface, surface_x, surface_y, .. } => {
+                focused = Some(surface);
+                println!("Pointer entered at ({}, {}).", surface_x, surface_y);
+            }
+            wl_pointer::Event::Leave { .. } => {
+                focused = None;
+                println!("Pointer left.");
+            }
+            wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
+                cursor_pos = kurbo::Point::new(surface_x, surface_y);
+                if let Ok(state) = borrow!(app.state) {
+                    for window in &state.windows {
+                        if Some(window.wl_surface.detach()) == focused {
+                            if let Ok(mut handler) = borrow_mut!(window.handler) {
+                                handler.mouse_move(&MouseEvent {
+                                    pos: cursor_pos,
+                                    buttons: crate::mouse::MouseButtons::default(),
+                                    mods: crate::Modifiers::default(),
+                                    count: 0,
+                                    focus: true,
+                                    button: crate::mouse::MouseButton::None,
+                                    wheel_delta: kurbo::Vec2::ZERO,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            wl_pointer::Event::Button { button, state: button_state, .. } => {
+                if let Ok(state) = borrow!(app.state) {
+                    for window in &state.windows {
+                        if Some(window.wl_surface.detach()) == focused {
+                            if let Ok(mut handler) = borrow_mut!(window.handler) {
+                                let event = MouseEvent {
+                                    pos: cursor_pos,
+                                    buttons: crate::mouse::MouseButtons::default().with(crate::mouse::MouseButton::Left),
+                                    mods: crate::Modifiers::default(),
+                                    count: 1,
+                                    focus: true,
+                                    button: crate::mouse::MouseButton::Left,
+                                    wheel_delta: kurbo::Vec2::ZERO,
+                                };
+                                match button_state {
+                                    wl_pointer::ButtonState::Pressed => {
+                                        handler.mouse_down(&event);
+                                    }
+                                    wl_pointer::ButtonState::Released => {
+                                        handler.mouse_up(&event);
+                                    }
+                                    _ => unimplemented!()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        },
+        Events::Keyboard { event, .. } => match event {
+            wl_keyboard::Event::Enter { .. } => {
+                println!("Gained keyboard focus.");
+            }
+            wl_keyboard::Event::Leave { .. } => {
+                println!("Lost keyboard focus.");
+            }
+            wl_keyboard::Event::Key { key, state, .. } => {
+                println!("Key with id {} was {:?}.", key, state);
+            }
+            _ => {}
+        },
+    })
 }

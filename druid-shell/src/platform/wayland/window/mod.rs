@@ -80,8 +80,18 @@ impl Window {
     pub fn bring_to_front_and_focus(&self) {}
 
     pub fn request_anim_frame(&self) {
-        if let Err(err) = self.render() {
-            eprintln!("Window::request_anim_frame - failed to render: {}", err);
+        self.request_frame();
+        return;
+        static mut count: usize = 0;
+        unsafe {
+            if count < 3 {
+                if let Err(err) = self.render() {
+                    eprintln!("Window::request_anim_frame - failed to render: {}", err);
+                }
+                count += 1;
+            } else {
+                self.render().expect("Rendering should just work");
+            }
         }
     }
 
@@ -93,6 +103,7 @@ impl Window {
     }
 
     fn invalidate_rect(&self, rect: Rect) {
+        #[cfg(disabled)]
         if let Err(err) = self.add_invalid_rect(rect) {
             log::error!("Window::invalidate_rect - failed to enlarge rect: {}", err);
         }
@@ -115,7 +126,17 @@ impl Window {
         Ok(())
     }
 
-    fn render(&self) -> Result<()> {
+    fn request_frame(&self) {
+        let callback = self.wl_surface.frame();
+        let window_id = self.id;
+        let app = self.app.clone();
+        callback.quick_assign(move |_wl_surface, event, _| {
+            app.render_window(window_id);
+        });
+        self.wl_surface.commit();
+    }
+
+    pub fn render(&self) -> Result<()> {
         borrow_mut!(self.handler)?.prepare_paint();
         self.update_surface()?;
         {
@@ -133,6 +154,7 @@ impl Window {
             let err;
             match borrow_mut!(self.handler) {
                 Ok(mut handler) => {
+                    println!("called paint");
                     handler.paint(&mut piet_ctx, &state.invalid);
                     err = piet_ctx
                         .finish()
@@ -155,6 +177,7 @@ impl Window {
     }
 
     fn update_surface(&self) -> Result<()> {
+        println!("called update_surface");
         let size = borrow!(self.state)?.size;
         borrow_mut!(self.state)?.invalid.add_rect(size.to_rect());
         let buf_len = (size.width * size.height) as u64 * 4;
@@ -196,10 +219,13 @@ impl Window {
     }
 
     fn update_buffer(&self) -> Result<()> {
+        println!("called update_buffer");
+        let size = borrow!(self.state)?.size;
         let wl_surface = &self.wl_surface;
         let handle = borrow!(self.buffer_handle)?;
         let buffer: &wl_buffer::WlBuffer = handle.as_ref().unwrap();
         wl_surface.attach(Some(buffer), 0, 0);
+        wl_surface.damage_buffer(0, 0, size.width as i32, size.height as i32);
         wl_surface.commit();
         Ok(())
     }
