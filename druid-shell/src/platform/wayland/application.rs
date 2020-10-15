@@ -177,11 +177,10 @@ fn event_filter(app: Application) -> wayland_client::Filter<Events> {
                 ..
             } => {
                 focused = Some(surface);
-                println!("Pointer entered at ({}, {}).", surface_x, surface_y);
+                cursor_pos = kurbo::Point::new(surface_x, surface_y);
             }
             wl_pointer::Event::Leave { .. } => {
                 focused = None;
-                println!("Pointer left.");
             }
             wl_pointer::Event::Motion {
                 surface_x,

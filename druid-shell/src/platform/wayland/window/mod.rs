@@ -15,7 +15,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use wayland_client::{
-    protocol::{wl_buffer, wl_shm, wl_shm_pool, wl_surface, wl_callback},
+    protocol::{wl_buffer, wl_callback, wl_shm, wl_shm_pool, wl_surface},
     Main,
 };
 use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_toplevel};
@@ -146,7 +146,6 @@ impl Window {
             let err;
             match borrow_mut!(self.handler) {
                 Ok(mut handler) => {
-                    println!("called paint");
                     handler.paint(&mut piet_ctx, &state.invalid);
                     err = piet_ctx
                         .finish()
@@ -169,7 +168,6 @@ impl Window {
     }
 
     fn update_surface(&self) -> Result<()> {
-        println!("called update_surface");
         let size = borrow!(self.state)?.size;
         borrow_mut!(self.state)?.invalid.add_rect(size.to_rect());
         let buf_len = (size.width * size.height) as u64 * 4;
@@ -211,7 +209,6 @@ impl Window {
     }
 
     fn update_buffer(&self) -> Result<()> {
-        println!("called update_buffer");
         let size = borrow!(self.state)?.size;
         let wl_surface = &self.wl_surface;
         let handle = borrow!(self.buffer_handle)?;
