@@ -150,19 +150,6 @@ impl Application {
                 .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })?;
         }
     }
-
-    pub fn render_window(&self, window_id: u32) {
-        if let Ok(state) = borrow!(self.state) {
-            for window in &state.windows {
-                if window.id == window_id {
-                    if let Err(err) = window.render() {
-                        log::error!("{}", err);
-                    }
-                    break;
-                }
-            }
-        }
-    }
 }
 
 fn event_filter(app: Application) -> wayland_client::Filter<Events> {

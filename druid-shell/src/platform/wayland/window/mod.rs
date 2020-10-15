@@ -13,6 +13,7 @@ use std::{
     cell::RefCell,
     collections::BinaryHeap,
     sync::{Arc, Mutex},
+    rc,
 };
 use wayland_client::{
     protocol::{wl_buffer, wl_callback, wl_shm, wl_shm_pool, wl_surface},
@@ -44,6 +45,7 @@ pub(super) struct WindowState {
 
 pub(crate) struct Window {
     pub(crate) id: u32,
+    pub(crate) this: RefCell<rc::Weak<Window>>,
     pub(super) app: Application,
     pub(super) handler: RefCell<Box<dyn WinHandler>>,
     pub(super) state: RefCell<WindowState>,
@@ -83,7 +85,18 @@ impl Window {
     pub fn bring_to_front_and_focus(&self) {}
 
     pub fn request_anim_frame(&self) {
-        self.request_frame();
+        let callback = self.wl_surface.frame();
+        let this = borrow!(self.this).unwrap().clone();
+        callback.quick_assign(move |_, event, _| {
+            if let wl_callback::Event::Done { .. } = event {
+                if let Some(this) = this.upgrade() {
+                    if let Err(err) = this.render() {
+                        log::error!("{}", err);
+                    }
+                }
+            }
+        });
+        self.wl_surface.commit();
     }
 
     fn invalidate(&self) {
@@ -114,18 +127,6 @@ impl Window {
     fn add_invalid_rect(&self, rect: Rect) -> Result<(), Error> {
         borrow_mut!(self.state)?.invalid.add_rect(rect.expand());
         Ok(())
-    }
-
-    fn request_frame(&self) {
-        let callback = self.wl_surface.frame();
-        let window_id = self.id;
-        let app = self.app.clone();
-        callback.quick_assign(move |_, event, _| {
-            if let wl_callback::Event::Done { .. } = event {
-                app.render_window(window_id);
-            }
-        });
-        self.wl_surface.commit();
     }
 
     pub fn render(&self) -> Result<()> {

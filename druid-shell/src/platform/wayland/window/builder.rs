@@ -4,7 +4,7 @@ use crate::{
     window, Error, WinHandler,
 };
 use anyhow::{anyhow, Context};
-use std::{cell::RefCell, collections::BinaryHeap, rc::Rc, sync::Arc, sync::Mutex};
+use std::{cell::RefCell, collections::BinaryHeap, rc::{self, Rc}, sync::Arc, sync::Mutex};
 use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_wm_base};
 
 use super::{Window, WindowState};
@@ -106,8 +106,11 @@ impl WindowBuilder {
         state.size = self.size;
         let state = RefCell::new(state);
 
+        let this = RefCell::new(rc::Weak::new());
+
         let window = Window {
             id,
+            this,
             app,
             handler,
             state,
@@ -123,6 +126,7 @@ impl WindowBuilder {
             idle_queue,
         };
         let window = Rc::new(window);
+        window.this.replace(Rc::downgrade(&window));
 
         let handle = WindowHandle::new(id, Rc::downgrade(&window));
         let shell_handle = crate::WindowHandle::from(handle.clone());
