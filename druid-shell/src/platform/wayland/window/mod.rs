@@ -100,8 +100,8 @@ impl Window {
     }
 
     fn invalidate(&self) {
-        match borrow!(self.state) {
-            Ok(state) => self.invalidate_rect(state.size.to_rect()),
+        match borrow!(self.state).map(|state| state.size.to_rect()) {
+            Ok(rect) => self.invalidate_rect(rect),
             Err(err) => log::error!("Window::invalidate - failed to get state: {}", err),
         }
     }
@@ -110,7 +110,6 @@ impl Window {
         if let Err(err) = self.add_invalid_rect(rect) {
             log::error!("Window::invalidate_rect - failed to enlarge rect: {}", err);
         }
-
         self.request_anim_frame();
     }
 
