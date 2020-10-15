@@ -3,7 +3,7 @@ use crate::{
     kurbo::{Point, Rect, Size},
     piet::PietText,
     platform::{menu::Menu, timer::Timer, window::IdleHandle, window::Window},
-    window, Cursor, FileDialogOptions, FileInfo, Scale, TimerToken, WindowLevel,
+    window, Cursor, FileDialogOptions, FileInfo, Scale, TimerToken, WindowLevel, CursorDesc
 };
 use std::{rc::Weak, sync::Arc, time::Instant};
 
@@ -135,6 +135,10 @@ impl WindowHandle {
     }
 
     pub fn set_cursor(&mut self, _cursor: &Cursor) {}
+
+    pub fn make_cursor(&self, _cursor_desc: &CursorDesc) -> Option<Cursor> {
+        None
+    }
 
     pub fn open_file_sync(&mut self, _options: FileDialogOptions) -> Option<FileInfo> {
         None

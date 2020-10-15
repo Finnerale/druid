@@ -60,6 +60,9 @@ pub(crate) struct Window {
     pub(super) idle_queue: Arc<Mutex<Vec<IdleKind>>>,
 }
 
+#[derive(Clone)]
+pub struct CustomCursor();
+
 impl Window {
     pub fn show(&self) {
         if let Err(e) = self.render() {
