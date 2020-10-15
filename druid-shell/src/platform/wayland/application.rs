@@ -4,7 +4,7 @@
 
 use crate::{
     application::AppHandler, error::Error, platform::clipboard::Clipboard,
-    platform::window::Window, MouseEvent,
+    platform::window::Window, MouseEvent, WinHandler
 };
 use anyhow::{Context, Result};
 use std::{cell::RefCell, rc::Rc, sync::Mutex};
@@ -150,95 +150,115 @@ impl Application {
                 .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })?;
         }
     }
+
+    fn with_window_handler(&self, focused: wl_surface::WlSurface, mut function: impl FnMut(&mut dyn WinHandler)) -> Result<()> {
+        let state = borrow!(self.state)?;
+        for window in &state.windows {
+            if window.wl_surface.detach() == focused {
+                let mut handler = borrow_mut!(window.handler)?;
+                function(handler.as_mut());
+                return Ok(());
+            }
+        }
+        Err(anyhow::anyhow!("Could not find window handler for window {:?}", focused))
+    }
 }
 
 fn event_filter(app: Application) -> wayland_client::Filter<Events> {
-    let mut cursor_pos = kurbo::Point::ZERO;
-    let mut focused: Option<wl_surface::WlSurface> = None;
-    wayland_client::Filter::new(move |event, _, _| match event {
-        Events::Pointer { event, .. } => match event {
-            wl_pointer::Event::Enter {
-                surface,
-                surface_x,
-                surface_y,
-                ..
-            } => {
-                focused = Some(surface);
-                cursor_pos = kurbo::Point::new(surface_x, surface_y);
-            }
-            wl_pointer::Event::Leave { .. } => {
-                focused = None;
-            }
-            wl_pointer::Event::Motion {
-                surface_x,
-                surface_y,
-                ..
-            } => {
-                cursor_pos = kurbo::Point::new(surface_x, surface_y);
-                if let Ok(state) = borrow!(app.state) {
-                    for window in &state.windows {
-                        if Some(window.wl_surface.detach()) == focused {
-                            if let Ok(mut handler) = borrow_mut!(window.handler) {
-                                handler.mouse_move(&MouseEvent {
-                                    pos: cursor_pos,
-                                    buttons: crate::mouse::MouseButtons::default(),
-                                    mods: crate::Modifiers::default(),
-                                    count: 0,
-                                    focus: true,
-                                    button: crate::mouse::MouseButton::None,
-                                    wheel_delta: kurbo::Vec2::ZERO,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            wl_pointer::Event::Button {
-                button: _,
-                state: button_state,
-                ..
-            } => {
-                if let Ok(state) = borrow!(app.state) {
-                    for window in &state.windows {
-                        if Some(window.wl_surface.detach()) == focused {
-                            if let Ok(mut handler) = borrow_mut!(window.handler) {
-                                let event = MouseEvent {
-                                    pos: cursor_pos,
-                                    buttons: crate::mouse::MouseButtons::default()
-                                        .with(crate::mouse::MouseButton::Left),
-                                    mods: crate::Modifiers::default(),
-                                    count: 1,
-                                    focus: true,
-                                    button: crate::mouse::MouseButton::Left,
-                                    wheel_delta: kurbo::Vec2::ZERO,
-                                };
-                                match button_state {
-                                    wl_pointer::ButtonState::Pressed => {
-                                        handler.mouse_down(&event);
-                                    }
-                                    wl_pointer::ButtonState::Released => {
-                                        handler.mouse_up(&event);
-                                    }
-                                    _ => unimplemented!(),
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {}
-        },
-        Events::Keyboard { event, .. } => match event {
-            wl_keyboard::Event::Enter { .. } => {
-                println!("Gained keyboard focus.");
-            }
-            wl_keyboard::Event::Leave { .. } => {
-                println!("Lost keyboard focus.");
-            }
-            wl_keyboard::Event::Key { key, state, .. } => {
-                println!("Key with id {} was {:?}.", key, state);
-            }
-            _ => {}
-        },
+    let mut handler = EventHandler::default();
+    wayland_client::Filter::new(move |event, _, _| {
+        if let Err(err) = handler.handle(event, &app) {
+            log::error!("Failed to handle event: {}", err);
+        }
     })
+}
+
+#[derive(Default)]
+struct EventHandler {
+    focused: Option<wl_surface::WlSurface>,
+    cursor: kurbo::Point,
+}
+
+impl EventHandler {
+    pub fn handle(&mut self, event: Events, app: &Application) -> Result<()> {
+        match event {
+            Events::Pointer { event, .. } => match event {
+                wl_pointer::Event::Enter {
+                    surface,
+                    surface_x,
+                    surface_y,
+                    ..
+                } => {
+                    self.focused = Some(surface);
+                    self.cursor = kurbo::Point::new(surface_x, surface_y);
+                }
+                wl_pointer::Event::Leave { .. } => {
+                    self.focused = None;
+                }
+                wl_pointer::Event::Motion {
+                    surface_x,
+                    surface_y,
+                    ..
+                } => {
+                    self.cursor = kurbo::Point::new(surface_x, surface_y);
+                    if let Some(focused) = self.focused.clone() {
+                        app.with_window_handler(focused, |handler| {
+                            handler.mouse_move(&MouseEvent {
+                                pos: self.cursor,
+                                buttons: crate::mouse::MouseButtons::default(),
+                                mods: crate::Modifiers::default(),
+                                count: 0,
+                                focus: true,
+                                button: crate::mouse::MouseButton::None,
+                                wheel_delta: kurbo::Vec2::ZERO,
+                            });
+                        })?;
+                    }
+                }
+                wl_pointer::Event::Button {
+                    button: _,
+                    state: button_state,
+                    ..
+                } => {
+                    if let Some(focused) = self.focused.clone() {
+                        app.with_window_handler(focused, |handler| {
+                            let event = MouseEvent {
+                                pos: self.cursor,
+                                buttons: crate::mouse::MouseButtons::default()
+                                    .with(crate::mouse::MouseButton::Left),
+                                mods: crate::Modifiers::default(),
+                                count: 1,
+                                focus: true,
+                                button: crate::mouse::MouseButton::Left,
+                                wheel_delta: kurbo::Vec2::ZERO,
+                            };
+                            match button_state {
+                                wl_pointer::ButtonState::Pressed => {
+                                    handler.mouse_down(&event);
+                                }
+                                wl_pointer::ButtonState::Released => {
+                                    handler.mouse_up(&event);
+                                }
+                                _ => unimplemented!(),
+                            }
+                        })?;
+                    }
+                }
+                _ => {}
+            },
+            Events::Keyboard { event, .. } => match event {
+                wl_keyboard::Event::Enter { .. } => {
+                    println!("Gained keyboard focus.");
+                }
+                wl_keyboard::Event::Leave { .. } => {
+                    println!("Lost keyboard focus.");
+                }
+                wl_keyboard::Event::Key { key, state, .. } => {
+                    println!("Key with id {} was {:?}.", key, state);
+                }
+                _ => {}
+            },
+        }
+        Ok(())
+    }
 }
