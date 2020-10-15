@@ -15,7 +15,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use wayland_client::{
-    protocol::{wl_buffer, wl_shm, wl_shm_pool, wl_surface},
+    protocol::{wl_buffer, wl_shm, wl_shm_pool, wl_surface, wl_callback},
     Main,
 };
 use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_toplevel};
@@ -84,18 +84,6 @@ impl Window {
 
     pub fn request_anim_frame(&self) {
         self.request_frame();
-        return;
-        static mut count: usize = 0;
-        unsafe {
-            if count < 3 {
-                if let Err(err) = self.render() {
-                    eprintln!("Window::request_anim_frame - failed to render: {}", err);
-                }
-                count += 1;
-            } else {
-                self.render().expect("Rendering should just work");
-            }
-        }
     }
 
     fn invalidate(&self) {
@@ -106,7 +94,6 @@ impl Window {
     }
 
     fn invalidate_rect(&self, rect: Rect) {
-        #[cfg(disabled)]
         if let Err(err) = self.add_invalid_rect(rect) {
             log::error!("Window::invalidate_rect - failed to enlarge rect: {}", err);
         }
@@ -133,8 +120,10 @@ impl Window {
         let callback = self.wl_surface.frame();
         let window_id = self.id;
         let app = self.app.clone();
-        callback.quick_assign(move |_wl_surface, event, _| {
-            app.render_window(window_id);
+        callback.quick_assign(move |_, event, _| {
+            if let wl_callback::Event::Done { .. } = event {
+                app.render_window(window_id);
+            }
         });
         self.wl_surface.commit();
     }

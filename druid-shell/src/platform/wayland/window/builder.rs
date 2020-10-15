@@ -5,7 +5,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context};
 use std::{cell::RefCell, collections::BinaryHeap, rc::Rc, sync::Arc, sync::Mutex};
-use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
+use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_wm_base};
 
 use super::{Window, WindowState};
 

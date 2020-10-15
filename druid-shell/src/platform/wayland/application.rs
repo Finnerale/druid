@@ -155,7 +155,9 @@ impl Application {
         if let Ok(state) = borrow!(self.state) {
             for window in &state.windows {
                 if window.id == window_id {
-                    window.render();
+                    if let Err(err) = window.render() {
+                        log::error!("{}", err);
+                    }
                     break;
                 }
             }
@@ -206,7 +208,7 @@ fn event_filter(app: Application) -> wayland_client::Filter<Events> {
                 }
             }
             wl_pointer::Event::Button {
-                button,
+                button: _,
                 state: button_state,
                 ..
             } => {
