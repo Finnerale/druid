@@ -2,11 +2,14 @@
 
 //! Implementation of features at the application scope.
 
-use crate::{MouseEvent, application::AppHandler, error::Error, platform::clipboard::Clipboard, platform::window::Window};
+use crate::{
+    application::AppHandler, error::Error, platform::clipboard::Clipboard,
+    platform::window::Window, MouseEvent,
+};
 use anyhow::{Context, Result};
 use std::{cell::RefCell, rc::Rc, sync::Mutex};
 use wayland_client::{
-    protocol::{wl_compositor, wl_seat, wl_shm, wl_pointer, wl_keyboard, wl_surface},
+    protocol::{wl_compositor, wl_keyboard, wl_pointer, wl_seat, wl_shm, wl_surface},
     GlobalManager, Main,
 };
 use wayland_protocols::xdg_shell::client::xdg_wm_base;
@@ -39,7 +42,7 @@ pub(crate) struct Globals {
 
 mod events {
     use wayland_client::event_enum;
-    use wayland_client::protocol::{wl_pointer, wl_keyboard};
+    use wayland_client::protocol::{wl_keyboard, wl_pointer};
     event_enum! {
         Events |
         Pointer => wl_pointer::WlPointer,
@@ -165,7 +168,12 @@ fn event_filter(app: Application) -> wayland_client::Filter<Events> {
     let mut focused: Option<wl_surface::WlSurface> = None;
     wayland_client::Filter::new(move |event, _, _| match event {
         Events::Pointer { event, .. } => match event {
-            wl_pointer::Event::Enter { surface, surface_x, surface_y, .. } => {
+            wl_pointer::Event::Enter {
+                surface,
+                surface_x,
+                surface_y,
+                ..
+            } => {
                 focused = Some(surface);
                 println!("Pointer entered at ({}, {}).", surface_x, surface_y);
             }
@@ -173,7 +181,11 @@ fn event_filter(app: Application) -> wayland_client::Filter<Events> {
                 focused = None;
                 println!("Pointer left.");
             }
-            wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
+            wl_pointer::Event::Motion {
+                surface_x,
+                surface_y,
+                ..
+            } => {
                 cursor_pos = kurbo::Point::new(surface_x, surface_y);
                 if let Ok(state) = borrow!(app.state) {
                     for window in &state.windows {
@@ -193,14 +205,19 @@ fn event_filter(app: Application) -> wayland_client::Filter<Events> {
                     }
                 }
             }
-            wl_pointer::Event::Button { button, state: button_state, .. } => {
+            wl_pointer::Event::Button {
+                button,
+                state: button_state,
+                ..
+            } => {
                 if let Ok(state) = borrow!(app.state) {
                     for window in &state.windows {
                         if Some(window.wl_surface.detach()) == focused {
                             if let Ok(mut handler) = borrow_mut!(window.handler) {
                                 let event = MouseEvent {
                                     pos: cursor_pos,
-                                    buttons: crate::mouse::MouseButtons::default().with(crate::mouse::MouseButton::Left),
+                                    buttons: crate::mouse::MouseButtons::default()
+                                        .with(crate::mouse::MouseButton::Left),
                                     mods: crate::Modifiers::default(),
                                     count: 1,
                                     focus: true,
@@ -214,7 +231,7 @@ fn event_filter(app: Application) -> wayland_client::Filter<Events> {
                                     wl_pointer::ButtonState::Released => {
                                         handler.mouse_up(&event);
                                     }
-                                    _ => unimplemented!()
+                                    _ => unimplemented!(),
                                 }
                             }
                         }

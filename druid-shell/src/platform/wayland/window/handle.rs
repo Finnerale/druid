@@ -3,7 +3,7 @@ use crate::{
     kurbo::{Point, Rect, Size},
     piet::PietText,
     platform::{menu::Menu, timer::Timer, window::IdleHandle, window::Window},
-    window, Cursor, FileDialogOptions, FileInfo, Scale, TimerToken, WindowLevel, CursorDesc
+    window, Cursor, CursorDesc, FileDialogOptions, FileInfo, Scale, TimerToken, WindowLevel,
 };
 use std::{rc::Weak, sync::Arc, time::Instant};
 
