@@ -8,12 +8,15 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use cairo::ImageSurface;
-use std::os::unix::io::AsRawFd;
 use std::{
     cell::RefCell,
     collections::BinaryHeap,
+    os::unix::io::AsRawFd,
     rc,
-    sync::{atomic, atomic::AtomicBool, Arc, Mutex},
+    sync::{
+        atomic::{self, AtomicBool},
+        Arc, Mutex,
+    },
 };
 use wayland_client::{
     protocol::{wl_buffer, wl_callback, wl_shm, wl_shm_pool, wl_surface},

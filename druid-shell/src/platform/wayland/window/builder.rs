@@ -3,14 +3,15 @@ use crate::{
     platform::{application::Application, menu::Menu, window::WindowHandle},
     window, Error, WinHandler,
 };
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use std::{
     cell::RefCell,
     collections::BinaryHeap,
     rc::{self, Rc},
-    sync::atomic::{self, AtomicBool},
-    sync::Arc,
-    sync::Mutex,
+    sync::{
+        atomic::{self, AtomicBool},
+        Arc, Mutex,
+    },
 };
 use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_wm_base};
 
@@ -135,7 +136,9 @@ impl WindowBuilder {
                     if !window.configured.swap(true, atomic::Ordering::Release) {
                         borrow_mut!(window.handler).unwrap().connect(&shell_handle);
                         borrow_mut!(window.handler).unwrap().size(size);
-                        window.render();
+                        if let Err(err) = window.render() {
+                            log::error!("Failed to present window {}: {}", window.id, err);
+                        }
                     }
                 }
             }

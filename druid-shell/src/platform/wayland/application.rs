@@ -3,8 +3,10 @@
 //! Implementation of features at the application scope.
 
 use crate::{
-    application::AppHandler, error::Error, platform::clipboard::Clipboard,
-    platform::window::Window, MouseEvent, WinHandler,
+    application::AppHandler,
+    error::Error,
+    platform::{clipboard::Clipboard, window::Window},
+    MouseEvent, WinHandler,
 };
 use anyhow::{Context, Result};
 use std::{cell::RefCell, rc::Rc, sync::Mutex};
