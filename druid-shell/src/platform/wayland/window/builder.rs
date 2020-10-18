@@ -100,6 +100,7 @@ impl WindowBuilder {
         state.size = self.size;
         let state = RefCell::new(state);
         let configured = AtomicBool::new(false);
+        let frame_requested = AtomicBool::new(false);
 
         let this = RefCell::new(rc::Weak::new());
 
@@ -111,6 +112,7 @@ impl WindowBuilder {
             state,
             configured,
 
+            frame_requested,
             cairo_surface,
             pool_handle,
             buffer_handle,

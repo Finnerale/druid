@@ -54,6 +54,7 @@ pub(crate) struct Window {
     pub(super) state: RefCell<WindowState>,
     pub(super) configured: AtomicBool,
 
+    pub(super) frame_requested: AtomicBool,
     pub(super) cairo_surface: RefCell<ImageSurface>,
     pub(super) pool_handle: RefCell<Option<wl_shm_pool::WlShmPool>>,
     pub(super) buffer_handle: RefCell<Option<wl_buffer::WlBuffer>>,
@@ -103,18 +104,23 @@ impl Window {
     pub fn bring_to_front_and_focus(&self) {}
 
     pub fn request_anim_frame(&self) {
-        let callback = self.wl_surface.frame();
-        let this = borrow!(self.this).unwrap().clone();
-        callback.quick_assign(move |_, event, _| {
-            if let wl_callback::Event::Done { .. } = event {
-                if let Some(this) = this.upgrade() {
-                    if let Err(err) = this.render() {
-                        log::error!("{}", err);
+        // Apparently Wayland allows requesting multiple frames, so we have to avoid that
+        // explicitly or we end up rendering multiple frames at once.
+        if !self.frame_requested.swap(true, atomic::Ordering::Acquire) {
+            let callback = self.wl_surface.frame();
+            let this = borrow!(self.this).unwrap().clone();
+            callback.quick_assign(move |_, event, _| {
+                if let wl_callback::Event::Done { .. } = event {
+                    if let Some(this) = this.upgrade() {
+                        this.frame_requested.store(false, atomic::Ordering::Release);
+                        if let Err(err) = this.render() {
+                            log::error!("{}", err);
+                        }
                     }
                 }
-            }
-        });
-        self.wl_surface.commit();
+            });
+            self.wl_surface.commit();
+        }
     }
 
     fn invalidate(&self) {
