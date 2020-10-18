@@ -76,7 +76,21 @@ impl Window {
     }
 
     pub fn close(&self) {
-        eprintln!("Can't close windows yet!");
+        if let Ok(mut state) = self.app.state.try_borrow_mut() {
+            self.xdg_toplevel.destroy();
+            self.wl_surface.destroy();
+            let index = state
+                .windows
+                .iter()
+                .enumerate()
+                .find(|(_, window)| window.id == self.id)
+                .map(|(index, _)| index);
+            if let Some(index) = index {
+                state.windows.remove(index);
+            }
+        } else {
+            log::error!("Application state already borrowed");
+        }
     }
 
     pub fn resizable(&self, _resizable: bool) {}

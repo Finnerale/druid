@@ -4,7 +4,7 @@
 
 use crate::{
     application::AppHandler, error::Error, platform::clipboard::Clipboard,
-    platform::window::Window, MouseEvent, WinHandler
+    platform::window::Window, MouseEvent, WinHandler,
 };
 use anyhow::{Context, Result};
 use std::{cell::RefCell, rc::Rc, sync::Mutex};
@@ -101,7 +101,13 @@ impl Application {
         }
     }
 
-    pub fn quit(&self) {}
+    pub fn quit(&self) {
+        if let Ok(mut state) = self.state.try_borrow_mut() {
+            state.quitting = true;
+        } else {
+            log::error!("Application state already borrowed");
+        }
+    }
 
     pub fn clipboard(&self) -> Clipboard {
         Clipboard {}
@@ -133,6 +139,13 @@ impl Application {
         });
     }
 
+    fn should_run(&self) -> bool {
+        self.state
+            .try_borrow()
+            .map(|state| !state.quitting && !state.windows.is_empty())
+            .unwrap_or(true)
+    }
+
     pub(crate) fn roundtrip(&self) -> Result<()> {
         self.event_queue
             .lock()
@@ -143,24 +156,34 @@ impl Application {
 
     fn inner_run(&self) -> Result<()> {
         self.roundtrip()?;
-        loop {
+        while self.should_run() {
             self.event_queue
                 .lock()
                 .map_err(|_| anyhow::anyhow!("Failed to lock Application::event_queue"))?
                 .dispatch(&mut (), |_, _, _| { /* we ignore unfiltered messages */ })?;
         }
+        Ok(())
     }
 
-    fn with_window_handler(&self, focused: wl_surface::WlSurface, mut function: impl FnMut(&mut dyn WinHandler)) -> Result<()> {
+    fn with_window_handler(
+        &self,
+        focused: wl_surface::WlSurface,
+        mut function: impl FnMut(&mut dyn WinHandler),
+    ) -> Result<()> {
         let state = borrow!(self.state)?;
         for window in &state.windows {
             if window.wl_surface.detach() == focused {
+                let window = window.clone();
+                drop(state);
                 let mut handler = borrow_mut!(window.handler)?;
                 function(handler.as_mut());
                 return Ok(());
             }
         }
-        Err(anyhow::anyhow!("Could not find window handler for window {:?}", focused))
+        Err(anyhow::anyhow!(
+            "Could not find window handler for window {:?}",
+            focused
+        ))
     }
 }
 
