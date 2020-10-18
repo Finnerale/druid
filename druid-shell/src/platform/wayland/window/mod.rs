@@ -12,8 +12,8 @@ use std::os::unix::io::AsRawFd;
 use std::{
     cell::RefCell,
     collections::BinaryHeap,
-    sync::{Arc, Mutex},
     rc,
+    sync::{atomic, atomic::AtomicBool, Arc, Mutex},
 };
 use wayland_client::{
     protocol::{wl_buffer, wl_callback, wl_shm, wl_shm_pool, wl_surface},
@@ -49,6 +49,7 @@ pub(crate) struct Window {
     pub(super) app: Application,
     pub(super) handler: RefCell<Box<dyn WinHandler>>,
     pub(super) state: RefCell<WindowState>,
+    pub(super) configured: AtomicBool,
 
     pub(super) cairo_surface: RefCell<ImageSurface>,
     pub(super) pool_handle: RefCell<Option<wl_shm_pool::WlShmPool>>,
@@ -129,6 +130,9 @@ impl Window {
     }
 
     pub fn render(&self) -> Result<()> {
+        if !self.configured.load(atomic::Ordering::Acquire) {
+            return Ok(());
+        }
         borrow_mut!(self.handler)?.prepare_paint();
         self.update_surface()?;
         {

@@ -4,7 +4,14 @@ use crate::{
     window, Error, WinHandler,
 };
 use anyhow::{anyhow, Context};
-use std::{cell::RefCell, collections::BinaryHeap, rc::{self, Rc}, sync::Arc, sync::Mutex};
+use std::{
+    cell::RefCell,
+    collections::BinaryHeap,
+    rc::{self, Rc},
+    sync::atomic::{self, AtomicBool},
+    sync::Arc,
+    sync::Mutex,
+};
 use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_wm_base};
 
 use super::{Window, WindowState};
@@ -72,20 +79,6 @@ impl WindowBuilder {
         xdg_toplevel.set_title("Wayplay".to_string());
         xdg_toplevel.set_app_id("wayplay".to_string());
 
-        xdg_surface.quick_assign(|xdg_surface, event, _| {
-            use xdg_surface::Event;
-            if let Event::Configure { serial } = event {
-                xdg_surface.ack_configure(serial);
-            }
-        });
-        wl_surface.commit();
-        self.app
-            .event_queue
-            .lock()
-            .map_err(|_| anyhow!("Failed to lock event_queue. ({}, {})", file!(), line!()))?
-            .sync_roundtrip(&mut (), |_, _, _| {})
-            .context("Failed to do sync roundtrip after committing the new surface")?;
-
         let cairo_surface = RefCell::new(
             cairo::ImageSurface::create(cairo::Format::ARgb32, 0, 0)
                 .context("Could not create empty Cairo surface")?,
@@ -105,6 +98,7 @@ impl WindowBuilder {
         let mut state = WindowState::default();
         state.size = self.size;
         let state = RefCell::new(state);
+        let configured = AtomicBool::new(false);
 
         let this = RefCell::new(rc::Weak::new());
 
@@ -114,6 +108,7 @@ impl WindowBuilder {
             app,
             handler,
             state,
+            configured,
 
             cairo_surface,
             pool_handle,
@@ -129,9 +124,24 @@ impl WindowBuilder {
         window.this.replace(Rc::downgrade(&window));
 
         let handle = WindowHandle::new(id, Rc::downgrade(&window));
-        let shell_handle = crate::WindowHandle::from(handle.clone());
-        borrow_mut!(window.handler)?.connect(&shell_handle);
-        borrow_mut!(window.handler)?.size(self.size);
+        window.xdg_surface.quick_assign({
+            let window = window.clone();
+            let shell_handle = crate::WindowHandle::from(handle.clone());
+            let size = self.size;
+            move |xdg_surface, event, _| {
+                use xdg_surface::Event;
+                if let Event::Configure { serial } = event {
+                    xdg_surface.ack_configure(serial);
+                    if !window.configured.swap(true, atomic::Ordering::Release) {
+                        borrow_mut!(window.handler).unwrap().connect(&shell_handle);
+                        borrow_mut!(window.handler).unwrap().size(size);
+                        window.render();
+                    }
+                }
+            }
+        });
+        window.wl_surface.commit();
+
         self.app.state.borrow_mut().windows.push(window);
 
         Ok(handle)
