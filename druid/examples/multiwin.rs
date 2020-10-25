@@ -64,6 +64,9 @@ fn ui_builder() -> impl Widget<State> {
     let new_button = Button::<State>::new("New window").on_click(|ctx, _data, _env| {
         ctx.submit_command(sys_cmds::NEW_FILE.to(Global));
     });
+    let close_button = Button::<State>::new("Close window").on_click(|ctx, _data, _env| {
+        ctx.submit_command(sys_cmds::CLOSE_WINDOW);
+    });
     let quit_button = Button::<State>::new("Quit app").on_click(|_ctx, _data, _env| {
         Application::global().quit();
     });
@@ -76,6 +79,7 @@ fn ui_builder() -> impl Widget<State> {
     col.add_flex_child(Align::centered(row), 1.0);
     let mut row = Flex::row();
     row.add_child(Padding::new(5.0, new_button));
+    row.add_child(Padding::new(5.0, close_button));
     row.add_child(Padding::new(5.0, quit_button));
     col.add_flex_child(Align::centered(row), 1.0);
     let content = ControllerHost::new(col, ContextMenuController);
