@@ -13,7 +13,7 @@ use std::{
         Arc, Mutex,
     },
 };
-use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_wm_base};
+use wayland_protocols::xdg_shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
 use super::{Window, WindowState};
 
@@ -142,6 +142,29 @@ impl WindowBuilder {
                             log::error!("Failed to present window {}: {}", window.id, err);
                         }
                     }
+                }
+            }
+        });
+        window.xdg_toplevel.quick_assign({
+            let window = window.clone();
+            let shell_handle = crate::WindowHandle::from(handle.clone());
+            move |_, event, _| {
+                use xdg_toplevel::Event;
+                match event {
+                    Event::Configure { width, height, .. } => {
+                        if width > 0 && height > 0 {
+                            let size = Size::new(width as f64, height as f64);
+                            if let Ok(mut state) = window.state.try_borrow_mut() {
+                                state.size = dbg!(size);
+                            }
+                            borrow_mut!(window.handler).unwrap().size(size);
+                            window.render();
+                        }
+                    }
+                    Event::Close => {
+                        window.close();
+                    }
+                    _ => {}
                 }
             }
         });
