@@ -18,20 +18,19 @@ use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::convert::TryFrom;
 use std::ffi::c_void;
-use std::ffi::OsString;
 use std::os::raw::{c_int, c_uint};
 use std::panic::Location;
 use std::ptr;
 use std::slice;
 use std::sync::{Arc, Mutex, Weak};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use cairo::Surface;
 use gdk::{EventKey, EventMask, ModifierType, ScrollDirection, WindowExt, WindowTypeHint};
 use gio::ApplicationExt;
 use gtk::prelude::*;
-use gtk::{AccelGroup, ApplicationWindow, DrawingArea};
+use gtk::{AccelGroup, ApplicationWindow, DrawingArea, SettingsExt};
 
 use crate::kurbo::{Point, Rect, Size, Vec2};
 use crate::piet::{Piet, PietText, RenderContext};
@@ -45,7 +44,7 @@ use crate::piet::ImageFormat;
 use crate::region::Region;
 use crate::scale::{Scalable, Scale, ScaledArea};
 use crate::window;
-use crate::window::{IdleToken, TimerToken, WinHandler, WindowLevel};
+use crate::window::{DeferredOp, FileDialogToken, IdleToken, TimerToken, WinHandler, WindowLevel};
 
 use super::application::Application;
 use super::dialog;
@@ -149,6 +148,10 @@ pub(crate) struct WindowState {
     pub(crate) handler: RefCell<Box<dyn WinHandler>>,
     idle_queue: Arc<Mutex<Vec<IdleKind>>>,
     current_keycode: Cell<Option<u16>>,
+    last_click: Cell<(f64, f64)>,
+    last_click_time: Cell<Instant>,
+    last_click_count: Cell<u8>,
+    deferred_queue: RefCell<Vec<DeferredOp>>,
 }
 
 #[derive(Clone)]
@@ -250,6 +253,10 @@ impl WindowBuilder {
             handler: RefCell::new(handler),
             idle_queue: Arc::new(Mutex::new(vec![])),
             current_keycode: Cell::new(None),
+            last_click: Cell::new((0.0, 0.0)),
+            last_click_time: Cell::new(Instant::now()),
+            last_click_count: Cell::new(0),
+            deferred_queue: RefCell::new(Vec::new()),
         });
 
         self.app
@@ -359,8 +366,6 @@ impl WindowBuilder {
                     // Note that we're borrowing the surface while calling the handler. This is ok,
                     // because we don't return control to the system or re-borrow the surface from
                     // any code that the client can call.
-                    // (TODO: the above comment isn't true yet because of save_as_sync and
-                    // open_sync, but it will be true soon)
                     state.with_handler_and_dont_check_the_other_borrows(|handler| {
                         let surface_context = cairo::Context::new(surface);
 
@@ -400,17 +405,40 @@ impl WindowBuilder {
                     if let Some(button) = get_mouse_button(event.get_button()) {
                         let scale = state.scale.get();
                         let button_state = event.get_state();
-                        handler.mouse_down(
-                            &MouseEvent {
-                                pos: Point::from(event.get_position()).to_dp(scale),
-                                buttons: get_mouse_buttons_from_modifiers(button_state).with(button),
-                                mods: get_modifiers(button_state),
-                                count: get_mouse_click_count(event.get_event_type()),
-                                focus: false,
-                                button,
-                                wheel_delta: Vec2::ZERO
-                            },
-                        );
+                        let gtk_count = get_mouse_click_count(event.get_event_type());
+                        let raw_pos = event.get_position();
+                        let count = if gtk_count == 1 {
+                            let this_click_time = Instant::now();
+                            let settings = state.drawing_area.get_settings().unwrap();
+                            let thresh_ms = settings.get_property_gtk_double_click_time();
+                            let thresh_dur = Duration::from_millis(thresh_ms as u64);
+                            let thresh_dist = settings.get_property_gtk_double_click_distance();
+                            let last_click = state.last_click.get();
+                            let dist = (raw_pos.0 - last_click.0).powi(2) + (raw_pos.1 - last_click.1).powi(2);
+                            if dist > (thresh_dist * thresh_dist) as f64 || this_click_time - state.last_click_time.get() > thresh_dur {
+                                state.last_click_count.set(0);
+                            }
+                            let count = state.last_click_count.get().saturating_add(1);
+                            state.last_click_count.set(count);
+                            state.last_click.set(raw_pos);
+                            state.last_click_time.set(this_click_time);
+                            count
+                        } else {
+                            0
+                        };
+                        if gtk_count == 0 || gtk_count == 1 {
+                            handler.mouse_down(
+                                &MouseEvent {
+                                    pos: Point::from(raw_pos).to_dp(scale),
+                                    buttons: get_mouse_buttons_from_modifiers(button_state).with(button),
+                                    mods: get_modifiers(button_state),
+                                    count,
+                                    focus: false,
+                                    button,
+                                    wheel_delta: Vec2::ZERO
+                                },
+                            );
+                        }
                     }
                 });
             }
@@ -623,7 +651,10 @@ impl WindowState {
             return None;
         }
 
-        self.with_handler_and_dont_check_the_other_borrows(f)
+        let ret = self.with_handler_and_dont_check_the_other_borrows(f);
+
+        self.run_deferred();
+        ret
     }
 
     #[track_caller]
@@ -688,6 +719,43 @@ impl WindowState {
             self.window.queue_draw();
         } else {
             log::warn!("Not invalidating rect because region already borrowed");
+        }
+    }
+
+    /// Pushes a deferred op onto the queue.
+    fn defer(&self, op: DeferredOp) {
+        self.deferred_queue.borrow_mut().push(op);
+    }
+
+    fn run_deferred(&self) {
+        let queue = self.deferred_queue.replace(Vec::new());
+        for op in queue {
+            match op {
+                DeferredOp::Open(options, token) => {
+                    let file_info = dialog::get_file_dialog_path(
+                        self.window.upcast_ref(),
+                        FileDialogType::Open,
+                        options,
+                    )
+                    .ok()
+                    .map(|s| FileInfo { path: s.into() });
+                    self.with_handler(|h| h.open_file(token, file_info));
+                }
+                DeferredOp::SaveAs(options, token) => {
+                    let file_info = dialog::get_file_dialog_path(
+                        self.window.upcast_ref(),
+                        FileDialogType::Save,
+                        options,
+                    )
+                    .ok()
+                    .map(|s| FileInfo { path: s.into() });
+                    self.with_handler(|h| h.save_as(token, file_info));
+                }
+                e => {
+                    // The other deferred ops shouldn't appear, because we don't defer them in GTK.
+                    log::error!("unexpected deferred op {:?}", e);
+                }
+            }
         }
     }
 }
@@ -900,16 +968,24 @@ impl WindowHandle {
         }
     }
 
-    pub fn open_file_sync(&mut self, options: FileDialogOptions) -> Option<FileInfo> {
-        self.file_dialog(FileDialogType::Open, options)
-            .ok()
-            .map(|s| FileInfo { path: s.into() })
+    pub fn open_file(&mut self, options: FileDialogOptions) -> Option<FileDialogToken> {
+        if let Some(state) = self.state.upgrade() {
+            let tok = FileDialogToken::next();
+            state.defer(DeferredOp::Open(options, tok));
+            Some(tok)
+        } else {
+            None
+        }
     }
 
-    pub fn save_as_sync(&mut self, options: FileDialogOptions) -> Option<FileInfo> {
-        self.file_dialog(FileDialogType::Save, options)
-            .ok()
-            .map(|s| FileInfo { path: s.into() })
+    pub fn save_as(&mut self, options: FileDialogOptions) -> Option<FileDialogToken> {
+        if let Some(state) = self.state.upgrade() {
+            let tok = FileDialogToken::next();
+            state.defer(DeferredOp::SaveAs(options, tok));
+            Some(tok)
+        } else {
+            None
+        }
     }
 
     /// Get a handle that can be used to schedule an idle task.
@@ -969,18 +1045,6 @@ impl WindowHandle {
     pub fn set_title(&self, title: impl Into<String>) {
         if let Some(state) = self.state.upgrade() {
             state.window.set_title(&(title.into()));
-        }
-    }
-
-    fn file_dialog(
-        &self,
-        ty: FileDialogType,
-        options: FileDialogOptions,
-    ) -> Result<OsString, ShellError> {
-        if let Some(state) = self.state.upgrade() {
-            dialog::get_file_dialog_path(state.window.upcast_ref(), ty, options)
-        } else {
-            Err(anyhow!("Cannot upgrade state from weak pointer to arc").into())
         }
     }
 }
