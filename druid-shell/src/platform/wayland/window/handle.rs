@@ -3,6 +3,7 @@ use crate::{
     kurbo::{Point, Rect, Size},
     piet::PietText,
     platform::{menu::Menu, timer::Timer, window::IdleHandle, window::Window},
+    window::FileDialogToken,
     window, Cursor, CursorDesc, FileDialogOptions, FileInfo, Scale, TimerToken, WindowLevel,
 };
 use std::{rc::Weak, sync::Arc, time::Instant};
@@ -140,11 +141,19 @@ impl WindowHandle {
         None
     }
 
+    pub fn open_file(&mut self, _options: FileDialogOptions) -> Option<FileDialogToken> {
+        None
+    }
+
     pub fn open_file_sync(&mut self, _options: FileDialogOptions) -> Option<FileInfo> {
         None
     }
 
     pub fn save_as_sync(&mut self, _options: FileDialogOptions) -> Option<FileInfo> {
+        None
+    }
+
+    pub fn save_as(&mut self, _options: FileDialogOptions) -> Option<FileDialogToken> {
         None
     }
 
